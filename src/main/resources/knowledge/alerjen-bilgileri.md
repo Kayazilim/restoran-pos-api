@@ -26,4 +26,6 @@ Türk Kahvesi alerjenleri: kahvenin kendisi alerjen içermez; yanında verilen l
 
 Limonata alerjenleri: bilinen alerjen içermez.
 
+Glutensiz seçenekler (çölyak hastalığı veya gluten hassasiyeti olan misafirler için): Mercimek Çorbası (kızarmış ekmek olmadan), Sebzeli Güveç, Çoban Salata, Fırın Sütlaç, Ayran ve Limonata. Menüdeki tek glutensiz tatlı Fırın Sütlaç'tır. Aşağıdaki çapraz bulaşma uyarısı bu ürünler için de geçerlidir.
+
 Çapraz bulaşma uyarısı: Mutfağımızda gluten, süt, yumurta, Antep fıstığı ve fındık içeren ürünler aynı ortamda hazırlanmaktadır. Çapraz bulaşma riski tamamen ortadan kaldırılamaz; ciddi alerjisi olan misafirler sipariş öncesinde mutfak sorumlusu ile görüşmelidir.
