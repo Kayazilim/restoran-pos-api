@@ -1,0 +1,44 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: restoran-pos-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: restoran_pos
+      MYSQL_USER: ${DB_USERNAME:-pos_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-pos_pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_pass}
+      TZ: UTC
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      # Veriler bu adlandırılmış birimde kalıcıdır; konteyner yeniden başlatılsa da silinmez.
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  app:
+    build: .
+    image: restoran-pos-api:1.0.0
+    container_name: restoran-pos-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/restoran_pos?allowPublicKeyRetrieval=true&useSSL=false&sessionVariables=innodb_lock_wait_timeout=5
+      DB_USERNAME: ${DB_USERNAME:-pos_user}
+      DB_PASSWORD: ${DB_PASSWORD:-pos_pass}
+      # Anahtar tanımlı değilse asistan, yalnızca belgelerden alıntı yapan güvenli modda çalışır.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-tanimlanmadi}
+      TZ: UTC
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql-data:

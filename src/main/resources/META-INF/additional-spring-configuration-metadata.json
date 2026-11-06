@@ -1,0 +1,49 @@
+{
+  "properties": [
+    {
+      "name": "pos.order.max-quantity-per-item",
+      "type": "java.lang.Integer",
+      "description": "Bir sipariş kaleminde izin verilen en yüksek adet."
+    },
+    {
+      "name": "pos.concurrency.lock-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Satır kilidi (SELECT ... FOR UPDATE) için beklenecek en uzun süre (milisaniye)."
+    },
+    {
+      "name": "pos.sse.heartbeat-seconds",
+      "type": "java.lang.Long",
+      "description": "Mutfak SSE bağlantılarına gönderilen canlı tutma (heartbeat) aralığı (saniye)."
+    },
+    {
+      "name": "pos.sse.emitter-timeout-minutes",
+      "type": "java.lang.Long",
+      "description": "Bir SSE bağlantısının açık kalabileceği en uzun süre (dakika)."
+    },
+    {
+      "name": "pos.qr.base-url",
+      "type": "java.lang.String",
+      "description": "Masa QR kodlarının içine yazılan adresin temel URL'i."
+    },
+    {
+      "name": "pos.report.zone-id",
+      "type": "java.lang.String",
+      "description": "Raporlarda gün sınırlarının hesaplandığı saat dilimi."
+    },
+    {
+      "name": "pos.assistant.gemini-api-key",
+      "type": "java.lang.String",
+      "description": "Gemini API anahtarı. 'tanimlanmadi' ise asistan anahtar kelime modunda çalışır."
+    },
+    {
+      "name": "pos.assistant.top-k",
+      "type": "java.lang.Integer",
+      "description": "RAG aramasında modele bağlam olarak verilecek en fazla belge parçası."
+    },
+    {
+      "name": "pos.assistant.similarity-threshold",
+      "type": "java.lang.Double",
+      "description": "Bir belge parçasının bağlama alınması için gereken en düşük benzerlik skoru."
+    }
+  ]
+}

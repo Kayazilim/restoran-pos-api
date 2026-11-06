@@ -1,0 +1,20 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+bin/
+
+# Ortam ve gizli bilgiler
+.env
+*.log
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db

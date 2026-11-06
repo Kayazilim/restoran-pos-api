@@ -1,0 +1,97 @@
+spring:
+  application:
+    name: restoran-pos-api
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/restoran_pos?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false&sessionVariables=innodb_lock_wait_timeout=5}
+    username: ${DB_USERNAME:pos_user}
+    password: ${DB_PASSWORD:pos_pass}
+    hikari:
+      # Satır kilidi alındıktan sonraki okumalar her zaman en güncel commit edilmiş veriyi görür.
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Şema ilk açılışta oluşturulur; veriler yeniden başlatmada korunur (create-drop KULLANILMAZ).
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  ai:
+    model:
+      chat: google-genai
+      embedding:
+        text: google-genai
+    retry:
+      max-attempts: 2
+      backoff:
+        initial-interval: 1s
+        multiplier: 2
+        max-interval: 5s
+    google:
+      genai:
+        # Anahtar yoksa "tanimlanmadi" değeri kullanılır; uygulama yine açılır ve asistan güvenli moda geçer.
+        api-key: ${GEMINI_API_KEY:tanimlanmadi}
+        chat:
+          model: ${GEMINI_CHAT_MODEL:gemini-2.5-flash}
+          temperature: 0.0
+          thinking-budget: ${GEMINI_THINKING_BUDGET:0}
+        embedding:
+          api-key: ${GEMINI_API_KEY:tanimlanmadi}
+          text:
+            model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      roles: YONETICI
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+
+info:
+  app:
+    name: "@project.name@"
+    description: "@project.description@"
+    version: "@project.version@"
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    persist-authorization: true
+
+# Uygulamaya özel ayarlar (her biri @Value ile constructor parametresine alınır)
+pos:
+  order:
+    max-quantity-per-item: 20
+  concurrency:
+    lock-timeout-ms: 5000
+  sse:
+    heartbeat-seconds: 25
+    emitter-timeout-minutes: 30
+  qr:
+    base-url: ${POS_QR_BASE_URL:http://localhost:8080/qr}
+  report:
+    zone-id: Europe/Istanbul
+  assistant:
+    gemini-api-key: ${GEMINI_API_KEY:tanimlanmadi}
+    top-k: 4
+    similarity-threshold: 0.55
+
+logging:
+  level:
+    com.restoran.pos: INFO
