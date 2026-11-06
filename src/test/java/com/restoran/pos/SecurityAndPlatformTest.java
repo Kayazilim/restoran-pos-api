@@ -21,13 +21,15 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Argon2id, Actuator erişim kuralları, OpenAPI/Swagger, masa QR hesabı ve genişletilebilir rol yapısı.
+ * Argon2id, Actuator erişim kuralları, OpenAPI/Swagger, masa QR hesabı, genişletilebilir rol yapısı ve
+ * elle yazılan isteklerdeki (ör. Postman) yaygın hatalara verilen açıklayıcı mesajlar.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -118,5 +120,40 @@ class SecurityAndPlatformTest {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get("/api/roles").with(httpBasic(KITCHEN, KITCHEN_PASSWORD)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void commonManualRequestMistakesGetClearTurkishMessages() throws Exception {
+        // Postman'de elle yazılan isteklerde sık görülen hatalar; her biri ortak hata modeli ve Türkçe açıklamayla döner.
+        mockMvc.perform(get("/api/products/").with(httpBasic(ADMIN, ADMIN_PASSWORD)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(
+                        "İstenen adres bulunamadı: /api/products/ (adresin sonundaki '/' işaretini kaldırıp tekrar deneyin)"));
+
+        mockMvc.perform(post("/api/products").with(httpBasic(ADMIN, ADMIN_PASSWORD))
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("{\"name\": \"X\"}"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.message", containsString("application/json")));
+
+        mockMvc.perform(post("/api/products").with(httpBasic(ADMIN, ADMIN_PASSWORD))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"X\", \"category\": \"Y\", \"price\": \"abc\", \"stockQuantity\": 1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("'price' alanı için geçersiz değer: 'abc'. Sayısal bir değer bekleniyor."));
+
+        mockMvc.perform(patch("/api/kitchen/orders/1").with(httpBasic(KITCHEN, KITCHEN_PASSWORD))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"HAZIR\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("'status' alanı için geçersiz değer: 'HAZIR'.")))
+                .andExpect(jsonPath("$.message", containsString("PREPARING")))
+                .andExpect(jsonPath("$.details").doesNotExist());
+
+        mockMvc.perform(post("/api/orders").with(httpBasic(WAITER_1, WAITER_PASSWORD))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tableId\": 1, \"items\": [{\"productId\": 10, \"quantity\": 1}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("'Idempotency-Key' başlığı zorunludur."));
     }
 }

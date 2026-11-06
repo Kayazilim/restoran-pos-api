@@ -292,10 +292,12 @@ Tüm hatalar `GlobalExceptionHandler` (`@RestControllerAdvice`) içinde tek merk
 
 | Kod | Ne zaman |
 |---|---|
-| 400 | Doğrulama hatası, bozuk JSON, hatalı parametre, eksik `Idempotency-Key`, PATCH ile id değiştirme |
+| 400 | Doğrulama hatası, bozuk JSON, hatalı parametre veya alan değeri (geçersiz durum değerinde geçerli değerler listelenir), eksik `Idempotency-Key`, PATCH ile id değiştirme |
 | 401 | Kimlik bilgisi yok, kullanıcı adı/parola hatalı veya hesap pasif (`WWW-Authenticate: Basic`) |
 | 403 | Gerekli yetki yok veya kayıt sahipliği kuralı ihlal edildi |
-| 404 | Kayıt veya adres bulunamadı |
+| 404 | Kayıt veya adres bulunamadı (adresin sonunda `/` varsa mesaj bunu belirtir) |
+| 405 | Adres bu HTTP metodunu desteklemiyor |
+| 415 | İstek gövdesi JSON değil (`Content-Type: application/json` gönderilmeli) |
 | 409 | Kaydın mevcut durumuyla çakışma: yetersiz stok, kapalı adisyon, geçersiz durum geçişi, tekrar eden benzersiz değer, eşzamanlı güncelleme |
 
 Uygulamaya özgü hata sınıfları `exception` paketindedir: `ResourceNotFoundException`, `BadRequestException`, `ConflictException`, `InsufficientStockException`, `ForbiddenOperationException`.
@@ -314,14 +316,21 @@ Testler Docker gerektirmez; MySQL uyumluluk kipindeki bellek içi H2 veritabanı
 | `OrderFlowTest` | QR müşteri siparişi → idempotent tekrar → kayıt sahipliği (403) → mutfak durumları → ödeme → adisyon kapatma |
 | `ConcurrencyTest` | Son porsiyon yarışı, çift tıklama ile sipariş ve çifte ödeme (gerçek eşzamanlı iş parçacıkları) |
 | `KitchenStreamTest` | Yeni siparişin mutfağın SSE bağlantısına anında düşmesi, olayda fiyat bilgisi olmaması, akışın yalnızca MUTFAK rolüne açık olması |
-| `SecurityAndPlatformTest` | Argon2id hash'i, Actuator erişim kuralları, OpenAPI/Swagger, masa QR hesabı, yeni rol tanımlama |
+| `SecurityAndPlatformTest` | Argon2id hash'i, Actuator erişim kuralları, OpenAPI/Swagger, masa QR hesabı, yeni rol tanımlama, elle yazılan isteklerdeki yaygın hataların Türkçe mesajları (sondaki `/`, JSON olmayan gövde, geçersiz alan değeri, eksik `Idempotency-Key`) |
 | `AssistantTest` | `@Lazy` RAG bean'i, belgeye dayalı cevap, belge dışı soruda uydurmama, yeni belgenin kullanılması |
 
 ## 16. Postman koleksiyonu
 
-1. Postman'de **Import** düğmesine basıp `postman/Restoran-POS-API.postman_collection.json` dosyasını seçin.
-2. Gerekirse **Collection → Variables** bölümünden `baseUrl` ve kullanıcı bilgilerini değiştirin. Tüm kimlik bilgileri değişkenlerle yönetilir.
-3. **Run collection** ile tüm istekleri sırayla çalıştırın. Her isteğin durum kodu testleri vardır.
+API, Postman masaüstü uygulamasıyla doğrudan kullanılabilir. Uygulama durumsuz (stateless) çalıştığı için oturum çerezi üretmez. Bu nedenle Postman'de kullanıcı değiştirmek için **Authorization** sekmesindeki kullanıcı adını ve parolayı değiştirmek yeterlidir; önceki girişten kalan bir çerez sonucu etkilemez.
+
+### Hazır koleksiyon
+
+1. Uygulamayı başlatın (`docker compose up -d --build`, bkz. [Hızlı başlangıç](#4-hızlı-başlangıç-docker)).
+2. Postman'de **Import** düğmesine basıp `postman/Restoran-POS-API.postman_collection.json` dosyasını seçin.
+3. Gerekirse **Collection → Variables** bölümünden `baseUrl` ve kullanıcı bilgilerini değiştirin. Tüm kimlik bilgileri değişkenlerle yönetilir.
+4. **Run collection** ile tüm istekleri sırayla çalıştırın (48 istek, 71 test). Koleksiyon tekrar tekrar çalıştırılabilir; her çalıştırma kendi kayıtlarını oluşturur. Gemini anahtarı tanımlı olmasa da tüm testler geçer; asistan bu durumda güvenli modda cevap verir.
+
+İstekleri tek tek gönderecekseniz klasör içindeki sırayı izleyin. Örneğin sipariş akışındaki `orderId` ve `billId` değişkenleri önceki isteklerin yanıtlarından doldurulur.
 
 | Klasör | İçerik |
 |---|---|
@@ -331,6 +340,27 @@ Testler Docker gerektirmez; MySQL uyumluluk kipindeki bellek içi H2 veritabanı
 | 4 - Personel Asistanı | Alerjen sorusu, belge dışı soru, belge yükleme |
 | 5 - Kullanıcı ve Rol Yönetimi | Argon2id ile kullanıcı oluşturma, pasifleştirme, silme |
 | 6 - Actuator ve Dokümantasyon | health, info, metrics (yönetici / 403), OpenAPI |
+
+### Kendi isteğinizi yazarken
+
+| Ayar | Ne yapılmalı |
+|---|---|
+| Authorization | **Basic Auth** seçin; kullanıcılar [Örnek kullanıcılar](#8-örnek-kullanıcılar-ve-rolleri) tablosundadır |
+| Body | **raw → JSON** seçin. Text, form-data veya x-www-form-urlencoded gönderilirse `415` döner |
+| Sipariş ve ödeme | `POST /api/orders` ve `POST /api/bills/{id}/payments` isteklerinde `Idempotency-Key` başlığı zorunludur; değer olarak `{{$guid}}` yazabilirsiniz. Aynı anahtarla tekrar gönderilen istek yeni kayıt açmaz: önceki kayıt `200` ve `Idempotent-Replayed: true` başlığıyla döner |
+| Adres | Sonuna `/` koymayın (`/api/products/` değil, `/api/products`) |
+
+Hatalı her istek, [hata modelindeki](#14-hata-modeli) JSON gövdesiyle ve ne yapılması gerektiğini söyleyen Türkçe bir mesajla döner. Örneğin mutfak durumu için `"HAZIR"` gönderilirse mesajda geçerli değerler (`PREPARING`, `READY` …) listelenir.
+
+**OpenAPI'den içe aktarma:** Postman'in **Import** penceresine `http://localhost:8080/v3/api-docs` adresini yapıştırarak tüm uç noktaları (52 işlem, Basic Auth tanımlı) Swagger belgesinden de oluşturabilirsiniz.
+
+**Mutfak bildirimlerini Postman'de izleme (SSE):** Yeni bir istekte `GET {{baseUrl}}/api/kitchen/stream` adresini `mutfak` / `Mutfak123!` ile gönderin. Postman (v10.10 ve sonrası) bağlantıyı açık tutar ve olayları yanıt alanında canlı olarak gösterir. Başka bir sekmeden sipariş verdiğinizde `order-created` olayı hemen gelir. Bu istek kasıtlı olarak koleksiyonda yoktur: akış kapanmadığı için **Run collection** çalışmasını bekletirdi.
+
+**Postman'in web sürümü:** Tarayıcıdan kullanılan Postman, `localhost` adreslerine ancak **Postman Desktop Agent** ile ulaşabilir. Masaüstü uygulamasında ek ayar gerekmez.
+
+**Başka bir bilgisayardan erişim:** `baseUrl` değişkenini uygulamanın çalıştığı bilgisayarın adresiyle değiştirin (ör. `http://192.168.1.20:8080`). Bunun için o bilgisayarın güvenlik duvarının 8080 portuna izin vermesi gerekir.
+
+**Verileri sıfırlama:** Önce `docker compose down -v`, ardından `docker compose up -d` komutunu çalıştırın. Veritabanı ilk açılıştaki örnek verilere döner.
 
 ## 17. Proje yapısı
 

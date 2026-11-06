@@ -22,6 +22,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.util.ClassUtils;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -34,12 +35,16 @@ import org.springframework.web.context.request.async.AsyncRequestTimeoutExceptio
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.InvalidFormatException;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Tüm hataların tek merkezden yönetildiği sınıf. Her hata, durum kodu ile tutarlı
@@ -96,6 +101,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException ex,
                                                          HttpServletRequest request) {
+        InvalidFormatException invalidValue = findCause(ex, InvalidFormatException.class);
+        if (invalidValue != null) {
+            return build(HttpStatus.BAD_REQUEST, invalidValueMessage(invalidValue), List.of(), request);
+        }
         String cause = NestedExceptionUtils.getMostSpecificCause(ex).getMessage();
         List<String> details = cause == null ? List.of() : List.of(shorten(cause));
         return build(HttpStatus.BAD_REQUEST,
@@ -137,8 +146,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex, HttpServletRequest request) {
-        return build(HttpStatus.NOT_FOUND, "İstenen adres bulunamadı: /" + ex.getResourcePath(), List.of(), request);
+    public ResponseEntity<ApiError> handleNoResource(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String message = "İstenen adres bulunamadı: " + path;
+        if (path.length() > 1 && path.endsWith("/")) {
+            // Spring 7 sondaki '/' işaretini eşlemez (/api/products/ ≠ /api/products); elle yazılan isteklerde sık görülür.
+            message += " (adresin sonundaki '/' işaretini kaldırıp tekrar deneyin)";
+        }
+        return build(HttpStatus.NOT_FOUND, message, List.of(), request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -210,6 +225,52 @@ public class GlobalExceptionHandler {
         ApiError body = new ApiError(Instant.now(clock), status.value(), status.getReasonPhrase(),
                 message, request.getRequestURI(), details);
         return new ResponseEntity<>(body, headers, status);
+    }
+
+    /** Ör. {"status": "HAZIR"} → "'status' alanı için geçersiz değer: 'HAZIR'. Geçerli değerler: ..." */
+    private static String invalidValueMessage(InvalidFormatException ex) {
+        String message = "'" + fieldPath(ex) + "' alanı için geçersiz değer: '" + ex.getValue() + "'.";
+        Class<?> targetType = ex.getTargetType() == null ? null : ClassUtils.resolvePrimitiveIfNecessary(ex.getTargetType());
+        if (targetType == null) {
+            return message;
+        }
+        if (targetType.isEnum()) {
+            return message + " Geçerli değerler: " + Arrays.stream(targetType.getEnumConstants())
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", ")) + ".";
+        }
+        if (Number.class.isAssignableFrom(targetType)) {
+            return message + " Sayısal bir değer bekleniyor.";
+        }
+        if (Boolean.class.equals(targetType)) {
+            return message + " true veya false bekleniyor.";
+        }
+        return message;
+    }
+
+    /** Jackson'ın alan yolunu okunur hale getirir: items → [0] → productId = "items[0].productId". */
+    private static String fieldPath(JacksonException ex) {
+        StringBuilder path = new StringBuilder();
+        for (JacksonException.Reference reference : ex.getPath()) {
+            if (reference.getPropertyName() != null) {
+                if (!path.isEmpty()) {
+                    path.append('.');
+                }
+                path.append(reference.getPropertyName());
+            } else if (reference.getIndex() >= 0) {
+                path.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+        return path.isEmpty() ? "gövde" : path.toString();
+    }
+
+    private static <T extends Throwable> T findCause(Throwable ex, Class<T> type) {
+        for (Throwable current = ex; current != null; current = current.getCause()) {
+            if (type.isInstance(current)) {
+                return type.cast(current);
+            }
+        }
+        return null;
     }
 
     private static String shorten(String text) {
