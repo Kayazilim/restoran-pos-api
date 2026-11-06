@@ -202,15 +202,21 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public void cancel(Long id, CurrentUser user) {
+    public void delete(Long id, CurrentUser user) {
         CustomerOrder order = lockOrderForModification(id, user);
-        // İptal edilen siparişin ürünleri stoğa iade edilir.
+        // Silinen siparişin ürünleri stoğa iade edilir ve tutarı adisyondan düşülür.
         applyStockChange(quantitiesOf(order), Map.of());
         Bill bill = lockOpenBill(order.getBill().getId());
         adjustBillTotal(bill, order.getTotalAmount().negate());
-        order.setStatus(OrderStatus.CANCELLED);
-        CustomerOrder saved = orderRepository.update(order);
-        publish(KitchenEventType.ORDER_CANCELLED, saved);
+        // Olay, sipariş bilgileri bellekteyken hazırlanır; mutfağa commit sonrasında gönderilir.
+        publish(KitchenEventType.ORDER_DELETED, order);
+        // Sipariş satırı ve kalemleri (CascadeType.ALL) veritabanından silinir.
+        orderRepository.delete(order);
+        // Adisyonda başka sipariş ve ödeme kalmadıysa boş adisyon da silinir (ödeme tutarı en az 0,01 olduğundan
+        // ödenen tutarın 0 olması hiç ödeme alınmadığı anlamına gelir).
+        if (orderRepository.countByBillId(bill.getId()) == 0 && bill.getPaidAmount().signum() == 0) {
+            billRepository.delete(bill);
+        }
     }
 
     /**
@@ -224,13 +230,13 @@ public class OrderServiceImpl implements OrderService {
         accessPolicy.checkTableAccess(user, table);
         if (user.isTableBound()) {
             throw new ForbiddenOperationException(
-                    "Müşteri hesapları verilen siparişi değiştiremez veya iptal edemez; lütfen garsonunuzdan yardım isteyin.");
+                    "Müşteri hesapları verilen siparişi değiştiremez veya silemez; lütfen garsonunuzdan yardım isteyin.");
         }
         CustomerOrder order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Sipariş", orderId));
         if (order.getStatus() != OrderStatus.CONFIRMED) {
             throw new ConflictException("Yalnızca 'Onaylandı' durumundaki (mutfağın henüz başlamadığı) siparişler "
-                    + "değiştirilebilir veya iptal edilebilir; siparişin durumu: " + order.getStatus().getLabel());
+                    + "değiştirilebilir veya silinebilir; siparişin durumu: " + order.getStatus().getLabel());
         }
         return order;
     }

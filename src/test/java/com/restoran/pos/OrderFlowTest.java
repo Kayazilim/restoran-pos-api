@@ -2,6 +2,9 @@ package com.restoran.pos;
 
 import com.jayway.jsonpath.JsonPath;
 import com.restoran.pos.dto.product.ProductResponse;
+import com.restoran.pos.repository.BillRepository;
+import com.restoran.pos.repository.OrderRepository;
+import com.restoran.pos.repository.UserAccountRepository;
 import com.restoran.pos.service.ProductService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +16,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static com.restoran.pos.TestUsers.ADMIN;
+import static com.restoran.pos.TestUsers.ADMIN_PASSWORD;
 import static com.restoran.pos.TestUsers.CASHIER;
 import static com.restoran.pos.TestUsers.CASHIER_PASSWORD;
 import static com.restoran.pos.TestUsers.KITCHEN;
@@ -38,7 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Masa 1 üzerinden uçtan uca akış: QR müşteri siparişi, idempotency, kayıt sahipliği, mutfak, kasa.
+ * Masa 1 üzerinden uçtan uca akış: QR müşteri siparişi, idempotency, kayıt sahipliği, mutfak, kasa;
+ * ayrıca siparişin DELETE ile veritabanından silinmesi.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -47,11 +53,18 @@ class OrderFlowTest {
 
     private final MockMvc mockMvc;
     private final ProductService productService;
+    private final OrderRepository orderRepository;
+    private final BillRepository billRepository;
+    private final UserAccountRepository userAccountRepository;
 
     @Autowired
-    OrderFlowTest(MockMvc mockMvc, ProductService productService) {
+    OrderFlowTest(MockMvc mockMvc, ProductService productService, OrderRepository orderRepository,
+                  BillRepository billRepository, UserAccountRepository userAccountRepository) {
         this.mockMvc = mockMvc;
         this.productService = productService;
+        this.orderRepository = orderRepository;
+        this.billRepository = billRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     @Test
@@ -115,7 +128,7 @@ class OrderFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PREPARING"));
 
-        // Hazırlanan sipariş iptal edilemez
+        // Mutfağın hazırlamaya başladığı sipariş silinemez
         mockMvc.perform(delete("/api/orders/{id}", orderId).with(httpBasic(WAITER_1, WAITER_PASSWORD)))
                 .andExpect(status().isConflict());
 
@@ -198,6 +211,43 @@ class OrderFlowTest {
         // Mutfak sipariş fiyatlarını, adisyonları ve ürün stoklarını göremez
         mockMvc.perform(get("/api/orders").with(httpBasic(KITCHEN, KITCHEN_PASSWORD))).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/bills").with(httpBasic(KITCHEN, KITCHEN_PASSWORD))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deletedOrderIsRemovedFromDatabaseAndStockIsRestored() throws Exception {
+        ProductResponse lemonade = findProduct("Limonata");
+        Long waiterId = userAccountRepository.findByUsername(WAITER_1).orElseThrow().getId();
+        String table = mockMvc.perform(post("/api/tables").with(httpBasic(ADMIN, ADMIN_PASSWORD))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tableNumber\": 3101, \"capacity\": 2, \"waiterId\": %d}".formatted(waiterId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long tableId = ((Number) JsonPath.read(table, "$.table.id")).longValue();
+
+        String created = mockMvc.perform(post("/api/orders").with(httpBasic(WAITER_1, WAITER_PASSWORD))
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tableId\": %d, \"items\": [{\"productId\": %d, \"quantity\": 3}]}"
+                                .formatted(tableId, lemonade.id())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long orderId = ((Number) JsonPath.read(created, "$.id")).longValue();
+        long billId = ((Number) JsonPath.read(created, "$.billId")).longValue();
+        assertThat(findProduct("Limonata").stockQuantity()).isEqualTo(lemonade.stockQuantity() - 3);
+
+        // Başka garson silemez (403); masanın garsonu siler (204)
+        mockMvc.perform(delete("/api/orders/{id}", orderId).with(httpBasic(WAITER_2, WAITER_PASSWORD)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/orders/{id}", orderId).with(httpBasic(WAITER_1, WAITER_PASSWORD)))
+                .andExpect(status().isNoContent());
+
+        // Kayıt veritabanından gerçekten silindi: API 404 döner, Repository de bulamaz; stok iade edildi
+        mockMvc.perform(get("/api/orders/{id}", orderId).with(httpBasic(WAITER_1, WAITER_PASSWORD)))
+                .andExpect(status().isNotFound());
+        assertThat(orderRepository.findById(orderId)).isEmpty();
+        assertThat(findProduct("Limonata").stockQuantity()).isEqualTo(lemonade.stockQuantity());
+        // Adisyonda başka sipariş ve ödeme kalmadığı için boş adisyon da silindi
+        assertThat(billRepository.findById(billId)).isEmpty();
     }
 
     private ProductResponse findProduct(String name) {

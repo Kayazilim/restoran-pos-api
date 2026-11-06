@@ -61,8 +61,7 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
 
         return new SalesReportResponse(start, end, zoneId.getId(),
-                reportRepository.countOrders(fromInstant, toInstant, false),
-                reportRepository.countOrders(fromInstant, toInstant, true),
+                reportRepository.countOrders(fromInstant, toInstant),
                 reportRepository.sumOrderTotals(fromInstant, toInstant),
                 collectedPayments,
                 paymentsByMethod,

@@ -109,11 +109,13 @@ public class OrderController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('" + Permissions.ORDER_DELETE + "')")
-    @Operation(summary = "Siparişi iptal et", description = "Mutfak hazırlamaya başlamadıysa sipariş iptal edilir ve stok iade edilir.")
-    @ApiResponse(responseCode = "204", description = "Sipariş iptal edildi")
-    public ResponseEntity<Void> cancel(@PathVariable Long id,
+    @Operation(summary = "Siparişi sil",
+            description = "Mutfak hazırlamaya başlamadıysa sipariş ve kalemleri veritabanından silinir, ürünler stoğa iade "
+                    + "edilir ve tutar adisyondan düşülür. Adisyonda başka sipariş ve ödeme kalmazsa boş adisyon da silinir.")
+    @ApiResponse(responseCode = "204", description = "Sipariş silindi")
+    public ResponseEntity<Void> delete(@PathVariable Long id,
                                        @Parameter(hidden = true) @AuthenticationPrincipal PosUserDetails principal) {
-        orderService.cancel(id, principal.currentUser());
+        orderService.delete(id, principal.currentUser());
         return ResponseEntity.noContent().build();
     }
 }

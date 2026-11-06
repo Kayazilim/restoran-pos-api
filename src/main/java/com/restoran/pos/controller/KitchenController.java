@@ -62,7 +62,7 @@ public class KitchenController {
     @PreAuthorize("hasAuthority('" + Permissions.KITCHEN_READ + "')")
     @Operation(summary = "Anlık sipariş bildirimleri (SSE)",
             description = "Mutfak ekranı bu bağlantıyı bir kez açar; sunucu yalnızca sipariş geldiğinde veya değiştiğinde "
-                    + "'order-created', 'order-updated', 'order-status-changed', 'order-cancelled' olaylarını gönderir. "
+                    + "'order-created', 'order-updated', 'order-status-changed', 'order-deleted' olaylarını gönderir. "
                     + "Sürekli sorgulama (polling) gerekmez.")
     public SseEmitter stream(@Parameter(hidden = true) @AuthenticationPrincipal PosUserDetails principal) {
         return kitchenService.subscribe(principal.currentUser());

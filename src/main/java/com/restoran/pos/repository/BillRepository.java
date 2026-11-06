@@ -24,6 +24,8 @@ public interface BillRepository {
 
     Bill update(Bill bill);
 
+    void delete(Bill bill);
+
     Set<Long> findTableIdsWithOpenBill();
 
     boolean existsByTableId(Long tableId);

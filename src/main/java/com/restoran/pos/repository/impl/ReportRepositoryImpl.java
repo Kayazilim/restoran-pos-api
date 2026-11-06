@@ -1,7 +1,6 @@
 package com.restoran.pos.repository.impl;
 
 import com.restoran.pos.entity.BillStatus;
-import com.restoran.pos.entity.OrderStatus;
 import com.restoran.pos.entity.PaymentMethod;
 import com.restoran.pos.repository.ReportRepository;
 import com.restoran.pos.repository.TopProductRow;
@@ -24,23 +23,20 @@ public class ReportRepositoryImpl implements ReportRepository {
     }
 
     @Override
-    public long countOrders(Instant from, Instant to, boolean cancelled) {
-        String statusCondition = cancelled ? "o.status = :cancelled" : "o.status <> :cancelled";
+    public long countOrders(Instant from, Instant to) {
         return entityManager.createQuery("SELECT COUNT(o) FROM CustomerOrder o"
-                        + " WHERE o.createdAt >= :from AND o.createdAt < :to AND " + statusCondition, Long.class)
+                        + " WHERE o.createdAt >= :from AND o.createdAt < :to", Long.class)
                 .setParameter("from", from)
                 .setParameter("to", to)
-                .setParameter("cancelled", OrderStatus.CANCELLED)
                 .getSingleResult();
     }
 
     @Override
     public BigDecimal sumOrderTotals(Instant from, Instant to) {
         BigDecimal total = entityManager.createQuery("SELECT SUM(o.totalAmount) FROM CustomerOrder o"
-                        + " WHERE o.createdAt >= :from AND o.createdAt < :to AND o.status <> :cancelled", BigDecimal.class)
+                        + " WHERE o.createdAt >= :from AND o.createdAt < :to", BigDecimal.class)
                 .setParameter("from", from)
                 .setParameter("to", to)
-                .setParameter("cancelled", OrderStatus.CANCELLED)
                 .getSingleResult();
         return total != null ? total : BigDecimal.ZERO;
     }
@@ -78,11 +74,9 @@ public class ReportRepositoryImpl implements ReportRepository {
         return entityManager.createQuery("SELECT new com.restoran.pos.repository.TopProductRow("
                         + "i.productName, SUM(i.quantity), SUM(i.lineTotal)) FROM OrderItem i"
                         + " WHERE i.order.createdAt >= :from AND i.order.createdAt < :to"
-                        + " AND i.order.status <> :cancelled"
                         + " GROUP BY i.productName ORDER BY SUM(i.quantity) DESC", TopProductRow.class)
                 .setParameter("from", from)
                 .setParameter("to", to)
-                .setParameter("cancelled", OrderStatus.CANCELLED)
                 .setMaxResults(limit)
                 .getResultList();
     }

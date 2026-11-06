@@ -12,7 +12,7 @@ import java.util.Map;
  */
 public interface ReportRepository {
 
-    long countOrders(Instant from, Instant to, boolean cancelled);
+    long countOrders(Instant from, Instant to);
 
     BigDecimal sumOrderTotals(Instant from, Instant to);
 

@@ -7,8 +7,7 @@ public enum OrderStatus {
 
     CONFIRMED("Onaylandı"),
     PREPARING("Hazırlanıyor"),
-    READY("Hazır"),
-    CANCELLED("İptal edildi");
+    READY("Hazır");
 
     private final String label;
 

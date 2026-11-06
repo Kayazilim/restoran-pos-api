@@ -101,6 +101,20 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
+    public void delete(CustomerOrder order) {
+        // Sipariş kalemleri (order_items) CascadeType.ALL + orphanRemoval ile birlikte silinir.
+        entityManager.remove(entityManager.contains(order) ? order : entityManager.merge(order));
+        entityManager.flush();
+    }
+
+    @Override
+    public long countByBillId(Long billId) {
+        return entityManager.createQuery("SELECT COUNT(o) FROM CustomerOrder o WHERE o.bill.id = :billId", Long.class)
+                .setParameter("billId", billId)
+                .getSingleResult();
+    }
+
+    @Override
     public long countByCreatedById(Long userId) {
         return entityManager.createQuery("SELECT COUNT(o) FROM CustomerOrder o WHERE o.createdBy.id = :userId", Long.class)
                 .setParameter("userId", userId)

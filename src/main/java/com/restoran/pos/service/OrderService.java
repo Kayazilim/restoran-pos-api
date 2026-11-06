@@ -22,5 +22,6 @@ public interface OrderService {
 
     OrderResponse patch(Long id, OrderPatchRequest request, CurrentUser user);
 
-    void cancel(Long id, CurrentUser user);
+    /** Siparişi veritabanından siler; stok iade edilir, tutar adisyondan düşülür. */
+    void delete(Long id, CurrentUser user);
 }

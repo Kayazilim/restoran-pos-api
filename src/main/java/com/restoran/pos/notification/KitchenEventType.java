@@ -8,7 +8,7 @@ public enum KitchenEventType {
     ORDER_CREATED("order-created"),
     ORDER_UPDATED("order-updated"),
     ORDER_STATUS_CHANGED("order-status-changed"),
-    ORDER_CANCELLED("order-cancelled");
+    ORDER_DELETED("order-deleted");
 
     private final String eventName;
 

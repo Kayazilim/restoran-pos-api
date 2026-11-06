@@ -98,6 +98,12 @@ public class BillRepositoryImpl implements BillRepository {
     }
 
     @Override
+    public void delete(Bill bill) {
+        entityManager.remove(entityManager.contains(bill) ? bill : entityManager.merge(bill));
+        entityManager.flush();
+    }
+
+    @Override
     public Set<Long> findTableIdsWithOpenBill() {
         return new HashSet<>(entityManager.createQuery(
                         "SELECT b.table.id FROM Bill b WHERE b.status = :status", Long.class)

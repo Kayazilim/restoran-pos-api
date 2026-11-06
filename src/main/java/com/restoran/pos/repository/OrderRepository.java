@@ -22,5 +22,9 @@ public interface OrderRepository {
 
     CustomerOrder update(CustomerOrder order);
 
+    void delete(CustomerOrder order);
+
+    long countByBillId(Long billId);
+
     long countByCreatedById(Long userId);
 }

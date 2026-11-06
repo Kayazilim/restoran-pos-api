@@ -69,21 +69,27 @@ Kafe ve restoranlarda yoğun saatlerde yaşanan eşzamanlılık krizlerini (son 
 
 ## 4. Hızlı başlangıç (Docker)
 
-```bash
-git clone https://github.com/Kayazilim/restoran-pos-api.git
-cd restoran-pos-api
-docker compose up -d --build
-```
+1. **Docker Desktop**'ı açın ve motorun çalıştığını ("Engine running") görün.
+2. Bir terminal (Windows'ta PowerShell) açın, projeyi indirip klasörüne girin:
 
-İlk açılışta MySQL hazırlanır, şema oluşturulur ve örnek veriler (kullanıcılar, masalar, menü, asistan belgeleri) yüklenir. Hazır olduğunu kontrol etmek için:
+   ```bash
+   git clone https://github.com/Kayazilim/restoran-pos-api.git
+   cd restoran-pos-api
+   ```
 
-```bash
-curl http://localhost:8080/actuator/health
-```
+3. MySQL'i ve uygulamayı başlatın. İlk seferde imajlar indirilip proje derlendiği için birkaç dakika sürebilir:
 
-Durdurmak için `docker compose down` komutunu kullanın. Veriler `mysql-data` biriminde saklandığından yeniden başlatmada **korunur**. Verileri tamamen silmek isterseniz `docker compose down -v` kullanın.
+   ```bash
+   docker compose up -d --build
+   ```
 
-**Gemini asistanı (isteğe bağlı):** [Google AI Studio](https://aistudio.google.com/apikey) üzerinden ücretsiz bir API anahtarı alın. `.env.example` dosyasını `.env` adıyla kopyalayın, `GEMINI_API_KEY=...` satırını doldurun ve `docker compose up -d` komutunu tekrar çalıştırın. Anahtar tanımlı değilse uygulama yine çalışır. Bu durumda asistan, yapay zeka kullanmadan belgelerden **birebir alıntı** yapan güvenli moda geçer.
+4. Tarayıcıda http://localhost:8080/actuator/health adresini açın. `{"status":"UP"}` görünüyorsa uygulama hazırdır. Swagger UI adresi: http://localhost:8080/swagger-ui.html
+
+İlk açılışta MySQL hazırlanır, şema oluşturulur ve örnek veriler (kullanıcılar, masalar, menü, asistan belgeleri) yüklenir. Uygulama günlüğünü izlemek için `docker logs -f restoran-pos-api` komutunu kullanın.
+
+Durdurmak için `docker compose down` komutunu kullanın. Veriler `mysql-data` biriminde saklandığından yeniden başlatmada **korunur**. Verileri tamamen silip örnek verilere dönmek isterseniz `docker compose down -v` kullanın. Koddaki bir değişikliği konteynere almak için `docker compose up -d --build` komutunu yeniden çalıştırın.
+
+**Gemini asistanı (isteğe bağlı):** [Google AI Studio](https://aistudio.google.com/apikey) üzerinden ücretsiz bir API anahtarı alın. Proje klasöründe `.env.example` dosyasını `.env` adıyla kopyalayın (PowerShell: `Copy-Item .env.example .env`). Dosyayı açın (`notepad .env`), anahtarı `GEMINI_API_KEY=` satırının sonuna yapıştırıp kaydedin ve `docker compose up -d` komutunu tekrar çalıştırın. `.env` dosyası `.gitignore` içinde olduğundan GitHub'a gönderilmez. Anahtar tanımlı değilse uygulama yine çalışır; asistan bu durumda yapay zeka kullanmadan belgelerden **birebir alıntı** yapan güvenli moda geçer.
 
 ## 5. Yerel geliştirme (MySQL Docker'da, uygulama terminalde)
 
@@ -93,6 +99,8 @@ docker compose up -d mysql
 ```
 
 Windows'ta `./mvnw` yerine `mvnw.cmd` kullanın. Gemini anahtarı vermek için PowerShell'de çalıştırmadan önce `$env:GEMINI_API_KEY="..."` komutunu girin.
+
+**IntelliJ IDEA ile:** Projeyi **File → Open** ile açın ve proje JDK'sı olarak 21'i seçin. `docker compose up -d mysql` ile yalnızca veritabanını başlatın, ardından `RestoranPosApplication` sınıfının yanındaki ▶ düğmesiyle uygulamayı çalıştırın. Gemini anahtarı için çalıştırma yapılandırmasındaki **Environment variables** alanına `GEMINI_API_KEY=...` yazın. Docker'daki uygulama konteyneri de açıksa 8080 portu çakışır; önce `docker compose stop app` ile onu durdurun.
 
 Jar oluşturup çalıştırmak için:
 
@@ -137,6 +145,34 @@ Uygulamaya özel ayarlar `application.yml` içinde `pos.*` altında bulunur ve s
 | `pos.report.zone-id` | Europe/Istanbul | `ReportServiceImpl` |
 | `pos.assistant.top-k` / `similarity-threshold` | 4 / 0.55 | `RagMenuAssistant` |
 
+### Kayıtları veritabanında görmek
+
+Postman'den yapılan ekleme, güncelleme ve silme işlemlerinin MySQL'e yansıdığını görmenin iki yolu vardır.
+
+**Terminalden (ek kurulum gerekmez):**
+
+```bash
+docker exec -it restoran-pos-mysql mysql -upos_user -ppos_pass restoran_pos
+```
+
+Açılan `mysql>` satırında örnek sorgular:
+
+```sql
+SHOW TABLES;
+SELECT id, name, price, stock_quantity, active FROM products;
+SELECT id, table_id, bill_id, status, total_amount FROM orders;
+SELECT order_id, product_name, quantity, line_total FROM order_items;
+SELECT id, table_id, status, total_amount, paid_amount FROM bills;
+```
+
+Çıkmak için `exit` yazın.
+
+**MySQL Workbench veya IntelliJ'nin Database penceresiyle:** Host `localhost`, port `3306`, kullanıcı `pos_user`, parola `pos_pass`, şema `restoran_pos`.
+
+**Örnek kontrol:**
+- Postman'de `DELETE /api/products/{id}` gönderin. Ardından `SELECT * FROM products WHERE id = {id};` sorgusu boş döner.
+- `PATCH /api/products/{id}` ile `{"price": 99}` gönderin. Ardından aynı satırda yalnızca `price` (ve `updated_at`, `version`) sütunu değişir.
+
 ## 7. Adresler
 
 | Ne | Adres | Erişim |
@@ -175,7 +211,7 @@ Okuma (`*_READ`), ekleme/güncelleme (`*_WRITE`, PUT ve PATCH dahil) ve silme (`
 | TABLE_WRITE / TABLE_DELETE | | | | | ✔ |
 | ORDER_READ (siparişler) | kendi masası | kendi masaları | ✔ | | ✔ |
 | ORDER_WRITE (sipariş verme/düzenleme) | yalnızca verme | ✔ | | | |
-| ORDER_DELETE (iptal) | | ✔ | | | |
+| ORDER_DELETE (sipariş silme) | | ✔ | | | |
 | KITCHEN_READ / KITCHEN_WRITE (mutfak, SSE) | | | | ✔ | |
 | BILL_READ (hesap) | kendi masası | kendi masaları | ✔ | | ✔ |
 | BILL_WRITE (ödeme, kapatma) | | | ✔ | | |
@@ -195,7 +231,7 @@ Okuma (`*_READ`), ekleme/güncelleme (`*_WRITE`, PUT ve PATCH dahil) ve silme (`
 | Menü | GET | `/api/menu`, `/api/menu/{id}` (`?category=`) |
 | Ürünler | GET, POST, PUT, PATCH, DELETE | `/api/products`, `/api/products/{id}` (`?category=&active=`) |
 | Masalar | GET, POST, PUT, PATCH, DELETE | `/api/tables`, `/api/tables/{id}`; QR yenileme: `POST /api/tables/{id}/qr-code` |
-| Siparişler | GET, POST, PUT, PATCH, DELETE (iptal) | `/api/orders`, `/api/orders/{id}` (`?status=&tableId=`) |
+| Siparişler | GET, POST, PUT, PATCH, DELETE | `/api/orders`, `/api/orders/{id}` (`?status=&tableId=`) |
 | Mutfak | GET, PATCH | `/api/kitchen/orders`, `/api/kitchen/orders/{id}`, SSE: `GET /api/kitchen/stream` |
 | Adisyon ve ödeme | GET, POST, PATCH | `/api/bills`, `/api/bills/{id}`, `/api/bills/{id}/payments` |
 | Kullanıcılar | GET, POST, PUT, PATCH, DELETE | `/api/users`, `/api/users/{id}`, `PUT /api/users/{id}/password` |
@@ -210,7 +246,9 @@ Tüm işlemler ve istek/cevap modelleri Swagger UI'da belgelenmiştir.
 - `POST` her zaman yeni kayıt oluşturur (`201 Created` + `Location` başlığı + üretilen kimlik). Gövdede gönderilen `id` yok sayılır, mevcut kaydı güncelleyemez.
 - `PUT` tam güncelleme yapar; gönderilmeyen isteğe bağlı alanlar boşaltılır.
 - `PATCH` kısmi güncelleme yapar; yalnızca gönderilen alanlar değişir. Gövdede URL'dekinden farklı bir `id` gönderilirse `400` döner.
-- `DELETE` başarılı olduğunda `204 No Content` döner.
+- `DELETE` kaydı veritabanından tamamen siler (`EntityManager.remove`) ve `204 No Content` döner. Silinen kayıt sonraki `GET` isteğinde `404` verir.
+  - Sipariş silinince kalemleri de silinir, ürünler stoğa iade edilir ve tutar adisyondan düşülür. Adisyonda başka sipariş ve ödeme kalmazsa boş adisyon da silinir. Mutfağın hazırlamaya başladığı sipariş silinemez (`409`).
+  - Geçmiş kayıtları bozacak silmeler veri bütünlüğü için `409` ve açıklayıcı bir mesajla reddedilir: siparişlerde kullanılmış ürün, adisyon geçmişi olan masa, işlem geçmişi olan kullanıcı, kullanıcılara atanmış rol. Bu kayıtlar `PATCH` ile pasif hale getirilebilir (`active=false` / `enabled=false`). Yeni oluşturulan veya hiç kullanılmamış kayıtlar her zaman silinir.
 
 ## 11. Eşzamanlılık çözümü
 
@@ -249,7 +287,7 @@ event:order-created
 data:{"orderId":15,"tableNumber":1,"status":"CONFIRMED","statusLabel":"Onaylandı","items":[{"productName":"Ayran","quantity":2,"note":"Soğuk olsun"}], ...}
 ```
 
-Olay türleri şunlardır: `connected`, `order-created`, `order-updated`, `order-status-changed`, `order-cancelled`. Bağlantıyı canlı tutmak için her 25 saniyede bir heartbeat yorumu gönderilir.
+Olay türleri şunlardır: `connected`, `order-created`, `order-updated`, `order-status-changed`, `order-deleted`. Bağlantıyı canlı tutmak için her 25 saniyede bir heartbeat yorumu gönderilir.
 
 `SseKitchenNotifier`, bean yaşam döngüsünü de gösterir:
 - `@PostConstruct`: heartbeat zamanlayıcısını başlatır.
@@ -313,7 +351,7 @@ Testler Docker gerektirmez; MySQL uyumluluk kipindeki bellek içi H2 veritabanı
 | Test sınıfı | Kapsam |
 |---|---|
 | `ProductApiTest` | CRUD, PUT/PATCH farkı, POST'ta id yok sayma, PATCH ile id değiştirme (400), 400/401/403/404 |
-| `OrderFlowTest` | QR müşteri siparişi → idempotent tekrar → kayıt sahipliği (403) → mutfak durumları → ödeme → adisyon kapatma |
+| `OrderFlowTest` | QR müşteri siparişi → idempotent tekrar → kayıt sahipliği (403) → mutfak durumları → ödeme → adisyon kapatma; siparişin DELETE ile veritabanından silinmesi, stok iadesi ve boş adisyonun silinmesi |
 | `ConcurrencyTest` | Son porsiyon yarışı, çift tıklama ile sipariş ve çifte ödeme (gerçek eşzamanlı iş parçacıkları) |
 | `KitchenStreamTest` | Yeni siparişin mutfağın SSE bağlantısına anında düşmesi, olayda fiyat bilgisi olmaması, akışın yalnızca MUTFAK rolüne açık olması |
 | `SecurityAndPlatformTest` | Argon2id hash'i, Actuator erişim kuralları, OpenAPI/Swagger, masa QR hesabı, yeni rol tanımlama, elle yazılan isteklerdeki yaygın hataların Türkçe mesajları (sondaki `/`, JSON olmayan gövde, geçersiz alan değeri, eksik `Idempotency-Key`) |
@@ -328,7 +366,7 @@ API, Postman masaüstü uygulamasıyla doğrudan kullanılabilir. Uygulama durum
 1. Uygulamayı başlatın (`docker compose up -d --build`, bkz. [Hızlı başlangıç](#4-hızlı-başlangıç-docker)).
 2. Postman'de **Import** düğmesine basıp `postman/Restoran-POS-API.postman_collection.json` dosyasını seçin.
 3. Gerekirse **Collection → Variables** bölümünden `baseUrl` ve kullanıcı bilgilerini değiştirin. Tüm kimlik bilgileri değişkenlerle yönetilir.
-4. **Run collection** ile tüm istekleri sırayla çalıştırın (48 istek, 71 test). Koleksiyon tekrar tekrar çalıştırılabilir; her çalıştırma kendi kayıtlarını oluşturur. Gemini anahtarı tanımlı olmasa da tüm testler geçer; asistan bu durumda güvenli modda cevap verir.
+4. **Run collection** ile tüm istekleri sırayla çalıştırın (51 istek, 75 test). Koleksiyon tekrar tekrar çalıştırılabilir; her çalıştırma kendi kayıtlarını oluşturur. Gemini anahtarı tanımlı olmasa da tüm testler geçer; asistan bu durumda güvenli modda cevap verir.
 
 İstekleri tek tek gönderecekseniz klasör içindeki sırayı izleyin. Örneğin sipariş akışındaki `orderId` ve `billId` değişkenleri önceki isteklerin yanıtlarından doldurulur.
 
@@ -336,7 +374,7 @@ API, Postman masaüstü uygulamasıyla doğrudan kullanılabilir. Uygulama durum
 |---|---|
 | 1 - Ürün CRUD | Listeleme, filtreleme, tek kayıt, ekleme, PUT, PATCH, DELETE |
 | 2 - Hata Senaryoları | 400 (doğrulama, id değiştirme, bozuk JSON), 404, 401 (yok, hatalı, pasif), 403 (yetki, sahiplik) |
-| 3 - Sipariş Akışı | QR sipariş, çift tıklama (idempotency), sahiplik 403'leri, mutfak, ödeme, kapatma, 409 stok |
+| 3 - Sipariş Akışı | QR sipariş, çift tıklama (idempotency), sahiplik 403'leri, mutfak, ödeme, kapatma, 409 stok, sipariş silme (DELETE → 404) |
 | 4 - Personel Asistanı | Alerjen sorusu, belge dışı soru, belge yükleme |
 | 5 - Kullanıcı ve Rol Yönetimi | Argon2id ile kullanıcı oluşturma, pasifleştirme, silme |
 | 6 - Actuator ve Dokümantasyon | health, info, metrics (yönetici / 403), OpenAPI |
@@ -384,6 +422,33 @@ src/main/java/com/restoran/pos
 
 İstek akışı her zaman **Controller → Service → Repository → Veritabanı** şeklindedir.
 
+`repository` paketi, teknik gerekliliklerdeki **Repository katmanıdır** ve DAO (Data Access Object) desenini izler. Her kaynak için bir arayüz (ör. `ProductRepository`) ve onu `EntityManager` ile gerçekleyen bir `@Repository` sınıfı (ör. `ProductRepositoryImpl`) bulunur. Controller sınıfları Repository'ye hiç erişmez. Veritabanı işlemleri yalnızca Repository sınıflarında yapılır; transaction sınırları ise Service sınıflarında `@Transactional` ile tanımlanır.
+
+| Kaynak | Entity → tablo | Controller | Service → gerçekleştirim | Repository → gerçekleştirim |
+|---|---|---|---|---|
+| Ürün ve menü | `Product` → `products` | `ProductController`, `MenuController` | `ProductService` → `ProductServiceImpl` | `ProductRepository` → `ProductRepositoryImpl` |
+| Masa | `RestaurantTable` → `restaurant_tables` | `TableController` | `TableService` → `TableServiceImpl` | `RestaurantTableRepository` → `RestaurantTableRepositoryImpl` |
+| Sipariş | `CustomerOrder`, `OrderItem` → `orders`, `order_items` | `OrderController` | `OrderService` → `OrderServiceImpl` | `OrderRepository` → `OrderRepositoryImpl` |
+| Mutfak | (sipariş) | `KitchenController` | `KitchenService` → `KitchenServiceImpl` | `OrderRepository` → `OrderRepositoryImpl` |
+| Adisyon ve ödeme | `Bill`, `Payment` → `bills`, `payments` | `BillController` | `BillService` → `BillServiceImpl` | `BillRepository`, `PaymentRepository` → `...RepositoryImpl` |
+| Kullanıcı | `UserAccount` → `users` | `UserController` | `UserService` → `UserServiceImpl` | `UserAccountRepository` → `UserAccountRepositoryImpl` |
+| Rol ve yetki | `Role`, `Permission` → `roles`, `permissions` | `RoleController`, `PermissionController` | `RoleService` → `RoleServiceImpl` | `RoleRepository`, `PermissionRepository` → `...RepositoryImpl` |
+| Asistan belgeleri | `KnowledgeDocument` → `knowledge_documents` | `KnowledgeDocumentController` | `KnowledgeDocumentService` → `KnowledgeDocumentServiceImpl` | `KnowledgeDocumentRepository` → `KnowledgeDocumentRepositoryImpl` |
+| Asistan | — | `AssistantController` | `AssistantService` → `AssistantServiceImpl` → `MenuAssistant` (`RagMenuAssistant`, `KeywordMenuAssistant`) | `KnowledgeDocumentRepository` (asistanlar belgeleri buradan okur) |
+| Raporlar | — (yalnızca sorgu) | `ReportController` | `ReportService` → `ReportServiceImpl` | `ReportRepository` → `ReportRepositoryImpl` |
+
+Üç entity'nin adı kaynak adından farklıdır, çünkü kısa adlar çakışma yaratır. `Order` SQL'deki `ORDER BY` ile, `User` SQL'de ayrılmış kelime olmasının yanında Spring Security'nin `User` sınıfıyla, `Table` ise JPA'nın `@Table` anotasyonuyla çakışır. Bu yüzden sınıflar `CustomerOrder`, `UserAccount` ve `RestaurantTable` adını taşır.
+
+### Lazy kullanımı
+
+| Nerede | Ne işe yarar |
+|---|---|
+| `assistant/RagMenuAssistant` sınıfında `@Lazy` | Gemini/RAG asistanı bean'i uygulama açılışında oluşturulmaz, ilk soru geldiğinde oluşturulur. |
+| `service/impl/AssistantServiceImpl` constructor'ında `@Lazy MenuAssistant` | Servise asistanın kendisi değil bir vekil (proxy) verilir. Böylece servis oluşturulurken asistan oluşturulmaz. |
+| `entity/` sınıflarında `@ManyToOne(fetch = FetchType.LAZY)` | İlişkili kayıt (ör. siparişin masası veya adisyonu) ancak erişildiğinde veritabanından okunur. Roller ve yetkiler her girişte gerektiği için `FetchType.EAGER`'dır. |
+
+Doğrulamak için uygulama açıldıktan sonra `docker logs restoran-pos-api` çıktısına bakın: "RAG asistanı ilk kullanımda oluşturuldu (@Lazy)" satırı yoktur. İlk asistan sorusu gönderildikten sonra bu satır görünür.
+
 ## 18. Teknik gereklilikler kontrol listesi
 
 | Gereklilik | Karşılandığı yer |
@@ -396,7 +461,7 @@ src/main/java/com/restoran/pos
 | Repository arayüzleri + `@Repository` sınıfları, `EntityManager` | `repository/impl/*RepositoryImpl` (`persist`, `find`, `createQuery`, `merge`, `remove`) |
 | Yalnızca constructor injection | Tüm bean'ler (`EntityManager` dahil) constructor ile alınır; `@Autowired` alan/setter yok |
 | `@Configuration` + `@Bean` | `AppConfig` (`Clock`, `SecureRandom`), `SecurityConfig` (`SecurityFilterChain`, `PasswordEncoder`), `OpenApiConfig` (`OpenAPI`, `OpenApiCustomizer`) |
-| `@Lazy` | `RagMenuAssistant` (bean) ve `AssistantServiceImpl` constructor parametresi |
+| `@Lazy` | `assistant/RagMenuAssistant` sınıfı (`@Lazy` bean) ve onu alan `service/impl/AssistantServiceImpl` constructor parametresi (`@Lazy MenuAssistant`). Kanıt: açılış günlüğünde "RAG asistanı ilk kullanımda oluşturuldu (@Lazy)" satırı yoktur, ilk `POST /api/assistant/questions` isteğinden sonra görünür (`docker logs restoran-pos-api`). Ayrıca entity ilişkilerinde `FetchType.LAZY` kullanılır (bkz. Bölüm 17) |
 | `@PostConstruct` / `@PreDestroy` | `SseKitchenNotifier` (heartbeat başlatma / bağlantıları kapatma), `RagMenuAssistant` |
 | Aynı arayüzün birden fazla gerçekleştirimi + `@Qualifier`/`@Primary` | `MenuAssistant`: `RagMenuAssistant` (`@Primary`), `KeywordMenuAssistant` (`@Qualifier`) |
 | Özel property + `@Value` ile constructor | `pos.*` ayarları (bkz. bölüm 6) |
@@ -411,7 +476,7 @@ src/main/java/com/restoran/pos
 | GET liste + `@PathVariable` ile tek kayıt | Tüm kaynaklar |
 | POST + üretilen kimlik, istemci id'si güncelleme yapamaz | `ProductController.create`, `ProductServiceImpl.create` (her zaman `persist`) |
 | PUT tam, PATCH kısmi güncelleme, PATCH ile PK değişmez | `*UpdateRequest`, `*PatchRequest`, `PatchGuard` |
-| DELETE | Tüm kaynaklar (siparişte iptal) |
+| DELETE | Tüm kaynaklar; kayıt veritabanından silinir (`*RepositoryImpl.delete` → `EntityManager.remove`), bkz. Bölüm 10 |
 | `@RequestBody` + Jackson | Tüm controller'lar |
 | Global exception handler + özel hata modeli | `GlobalExceptionHandler`, `ApiError`, özel hata sınıfları |
 | 404 / 400 tutarlı | Bölüm 14 |

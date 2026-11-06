@@ -610,7 +610,7 @@
     },
     {
       "name": "3 - Sipariş Akışı (QR Müşteri → Mutfak → Kasa)",
-      "description": "Sırayla çalıştırın. Sipariş ve ödeme isteklerinde Idempotency-Key başlığı otomatik üretilir; \"tekrar\" istekleri aynı anahtarı kullanır.",
+      "description": "Sırayla çalıştırın. Sipariş ve ödeme isteklerinde Idempotency-Key başlığı otomatik üretilir; \"tekrar\" istekleri aynı anahtarı kullanır. Son üç istek yeni bir sipariş açar, DELETE ile veritabanından siler ve silindiğini 404 ile doğrular.",
       "item": [
         {
           "name": "Müşteri menüyü görür",
@@ -1386,6 +1386,142 @@
               }
             }
           ]
+        },
+        {
+          "name": "Garson silinecek bir sipariş açar (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{orderIdempotencyKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{waiterUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{waiterPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableId\": 2,\n  \"items\": [\n    {\n      \"productId\": 12,\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('orderIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('deletedOrderId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Siparişi sil (DELETE)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{deletedOrderId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{waiterUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{waiterPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Silinen sipariş → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{deletedOrderId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{waiterUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{waiterPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Ortak hata modeli (status, message, timestamp)', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body).to.have.property('message');",
+                  "  pm.expect(body).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1887,6 +2023,11 @@
     },
     {
       "key": "billId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deletedOrderId",
       "value": "",
       "type": "string"
     },
