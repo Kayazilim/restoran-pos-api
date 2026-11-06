@@ -36,6 +36,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-pos_pass}
       # Anahtar tanımlı değilse asistan, yalnızca belgelerden alıntı yapan güvenli modda çalışır.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-tanimlanmadi}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-flash-lite-latest}
       TZ: UTC
     ports:
       - "8080:8080"

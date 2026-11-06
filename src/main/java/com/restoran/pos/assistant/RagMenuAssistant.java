@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -127,7 +128,9 @@ public class RagMenuAssistant implements MenuAssistant {
                     .toList();
             return AssistantAnswerResponse.grounded(question, answer.strip(), sources, MODE);
         } catch (RuntimeException ex) {
-            log.warn("Gemini çağrısı başarısız oldu, anahtar kelime moduna geçiliyor: {}", ex.getMessage());
+            // Spring AI hatayı genel bir mesajla sarar; asıl sebep (ör. 404 model yok, 503 yoğunluk) en içteki hatadadır.
+            log.warn("Gemini çağrısı başarısız oldu, anahtar kelime moduna geçiliyor: {}",
+                    NestedExceptionUtils.getMostSpecificCause(ex).getMessage());
             return fallbackAssistant.answer(question);
         }
     }

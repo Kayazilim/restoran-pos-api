@@ -113,7 +113,7 @@ Uygulama verileri **MySQL**'de kalıcı olarak saklanır. Şema, ilk açılışt
 | `MYSQL_ROOT_PASSWORD` | `root_pass` | Yalnızca MySQL konteyneri için |
 | `MYSQL_PORT` | `3306` | MySQL'in bilgisayarınızda açılacağı port (3306 doluysa ör. 3307) |
 | `GEMINI_API_KEY` | *(boş)* | Gemini API anahtarı; boşsa asistan anahtar kelime modunda çalışır |
-| `GEMINI_CHAT_MODEL` | `gemini-2.5-flash` | Sohbet modeli |
+| `GEMINI_CHAT_MODEL` | `gemini-flash-lite-latest` | Sohbet modeli. Varsayılan, Google'ın her zaman güncel "lite" modele yönlendirdiği takma addır; sabit sürüm adları (ör. `gemini-2.5-flash`) zamanla yeni kullanıcılara kapatılabilir |
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` | Embedding modeli |
 | `SERVER_PORT` | `8080` | HTTP portu |
 | `POS_QR_BASE_URL` | `http://localhost:8080/qr` | Masa QR kodlarına yazılan adresin başlangıcı |

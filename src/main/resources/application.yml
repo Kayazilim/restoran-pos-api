@@ -33,9 +33,10 @@ spring:
         # Anahtar yoksa "tanimlanmadi" değeri kullanılır; uygulama yine açılır ve asistan güvenli moda geçer.
         api-key: ${GEMINI_API_KEY:tanimlanmadi}
         chat:
-          model: ${GEMINI_CHAT_MODEL:gemini-2.5-flash}
+          # Takma ad: Google her zaman güncel "flash-lite" modele yönlendirir. Sabit sürüm adları
+          # (ör. gemini-2.5-flash) zamanla yeni kullanıcılara kapatıldığı için varsayılan olarak kullanılmaz.
+          model: ${GEMINI_CHAT_MODEL:gemini-flash-lite-latest}
           temperature: 0.0
-          thinking-budget: ${GEMINI_THINKING_BUDGET:0}
         embedding:
           api-key: ${GEMINI_API_KEY:tanimlanmadi}
           text:
