@@ -33,8 +33,9 @@ public class KnowledgeDocument {
     @Column(name = "document_type", nullable = false, length = 20)
     private DocumentType documentType;
 
+    /** Uzunluk açıkça verilir; aksi halde Hibernate MySQL'de 255 baytlık TINYTEXT seçer (bu değerle MEDIUMTEXT). */
     @Lob
-    @Column(name = "content", nullable = false)
+    @Column(name = "content", nullable = false, length = 1_000_000)
     private String content;
 
     @Column(name = "created_at", nullable = false, updatable = false)
